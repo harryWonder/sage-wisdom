@@ -96,42 +96,33 @@ With the steps above done, we should have our configuration file initialized. Th
 
 ```ini
 [global]
-repo1-path=/var/lib/pgbackrest
-repo1-retention-full=2
+# Local repository
+repo1-path=/var/lib/pgbackrest                # Where backups and WAL archives are stored on disk
+repo1-retention-full=2                        # Keep the last 2 full backups (older ones are expired)
+repo1-bundle=y                                # Bundle small files together to reduce I/O overhead
+repo1-block=y                                 # Enable block-level incremental (only copy changed blocks, not entire files)
 
-# S3 Repo configuration
-repo2-type=s3
-repo2-s3-bucket=coachli-database-backups
-repo2-s3-region=[your-s3-region]
-repo2-s3-key=[your-s3-key]
-repo2-s3-key-secret=[your-s3-key-secret]
-repo2-s3-endpoint=[your-s3-endpoint]
-repo2-path=/pgbackrest
-repo2-retention-full=2
+# S3 repository
+repo2-type=s3                                 # Use Amazon S3 as the storage backend
+repo2-s3-bucket=[bucket-name]                 # The name of your S3 bucket
+repo2-s3-region=[region]                      # AWS region where the bucket is hosted
+repo2-s3-endpoint=s3.[region].amazonaws.com   # S3 endpoint URL (adjust for non-AWS S3-compatible stores)
+repo2-s3-key=                                 # AWS access key ID (leave empty if using IAM roles)
+repo2-s3-key-secret=                          # AWS secret access key (leave empty if using IAM roles)
+repo2-path=/pgbackrest                        # Path prefix inside the S3 bucket for storing backups
+repo2-retention-full=7                        # Keep the last 7 full backups on S3 (longer retention than local)
+repo2-bundle=y                                # Bundle small files together for S3 (reduces API calls)
+repo2-block=y                                 # Block-level incremental for S3 (reduces transfer size)
 
-# Compression
-compress-type=zst
+# S3 timeout settings
+repo2-storage-upload-chunk-size=5242880       # 5MB upload chunks (default 1MB; larger chunks = fewer requests)
+io-timeout=300000                             # 5 minute I/O timeout in ms (default 60s; increase for large backups)
 
-# Bundle multiple files into the repo for efficiency
-repo1-bundle=y
-repo2-bundle=y
-
-# Enable block level backups (only copy what has changed)
-repo1-block=y
-repo2-block=y
-
-# Request an immediate checkpoint to speed up backup start
-start-fast=y
-
-# Total CPU processes to utilize during backup
-process-max=2
-
-# Logging
-log-level-console=info
-log-level-file=detail
-
-[stanza-name]
-pg1-path=/var/lib/postgresql/17/main
+# Global settings
+compress-type=zst                             # Use Zstandard compression (fast speed, good ratio)
+process-max=2                                 # Max parallel processes for backup/restore operations
+log-path=/var/log/pgbackrest                  # Directory for pgBackRest log files
+lock-path=/var/lock/pgbackrest                # Directory for lock files (prevents concurrent operations)
 ```
 
 For my use-case, this setup works best. PgBackRest supports more than one repository — for each new repository you want to add, simply suffix `repo` with a version number (`2` in the case of S3 being our secondary option).
